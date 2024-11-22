@@ -24,7 +24,7 @@ pipeline {
         }
         stage('Git Checkout') {
             steps {
-                git branch: 'main', changelog: false, credentialsId: 'git-cred', poll: false, url: 'https://github.com/PakiruChinoike/IndustriaSpringBoot'
+                git branch: 'main', changelog: false, credentialsId: 'git-cred', poll: false, url: 'https://github.com//projetoindustria/industria4.0'
             }
         }
 
@@ -72,9 +72,7 @@ pipeline {
         }
         stage('Deploy on server') { 
             steps { 
-                 sshagent (credentials: ['ssh-cred']) {
-                    sh 'ssh $SSH_USER@$SSH_IP -p $SSH_PORT uname -a'
-                  }
+
             }
         }
 
