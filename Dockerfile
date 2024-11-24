@@ -7,4 +7,4 @@ FROM eclipse-temurin AS run
 WORKDIR /app
 COPY --from=build ./build/target/*.jar ./app.jar
 
-ENTRYPOINT java -jar app.jar
+ENTRYPOINT ["java", "-jar app.jar"]
