@@ -20,7 +20,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: projetoindustria/industria-server:1.0
+    image: projetoindustria/industria-server:latest
     env_file: ./.env
     restart: always
     ports: ['${WEB_PORT_LOCAL}:${WEB_PORT_DOCKER}']
