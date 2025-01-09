@@ -6,6 +6,7 @@ pipeline {
         maven "maven3"
     }
 
+    
     environment{
         SCANNER_HOME = tool 'sonar-scanner'
         APP_NAME = "industria-server"
