@@ -47,7 +47,9 @@ pipeline {
         stage('Sonarqube analysis') {
             steps {
                 withSonarQubeEnv('sonarqube') {
-                    sh '$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=$APP_NAME -Dsonar.projectKey=$APP_NAME -Dsonar.java.binaries=.'
+                    withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONARQUBE_TOKEN')]) {
+                        sh '$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=$APP_NAME -Dsonar.projectKey=$APP_NAME -Dsonar.java.binaries=. -Dsonar.login=$SONARQUBE_TOKEN'
+                    }
                 }
             }
         }
@@ -55,7 +57,7 @@ pipeline {
         stage('Quality gate') {
             steps {
                 script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'sonarqube'
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
@@ -116,7 +118,7 @@ pipeline {
                      body: "Project: ${env.JOB_NAME}<br/>" +
                            "Build Number: ${env.BUILD_NUMBER}<br/>" +
                            "URL: ${env.BUILD_URL}<br/>",
-                     to: 'alxorozco@gmail.com',
+                     to: 'projetoindustriaifsul@gmail.com',
                      attachmentsPattern: 'trivy-fs-report.html,trivy-image-report.html'
         }
     }
