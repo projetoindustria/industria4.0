@@ -1,20 +1,27 @@
 pipeline {
     agent any
-    
+
     tools {
-        jdk 'jdk23'
-        maven 'maven3'
+        jdk "jdk23"
+        maven "maven3"
     }
+
+
     
-    environment {
-        SONAR_HOME = tool 'sonar-scanner'
-        registry = "projetoindustria/industria-server"
-        registryCredential = 'docker-hub'
-        dockerImage = ''
-        BUILD_NUMBER = '1.0'
+    environment{
+        SCANNER_HOME = tool 'sonar-scanner'
+        APP_NAME = "industria-server"
+        RELEASE = "1.0"
+        IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
     }
 
     stages {
+        stage('Clean workspace') {
+            steps {
+                cleanWs()
+            }
+        }
+
         stage('Load env file') {
             steps {
                 withCredentials([file(credentialsId: 'env-file', variable: 'mySecretEnvFile')]){
@@ -22,59 +29,95 @@ pipeline {
                 }
             }
         }
-        stage('Git Checkout') {
-            steps {
-                git branch: 'main', changelog: false, credentialsId: 'git-cred', poll: false, url: 'https://github.com//projetoindustria/industria4.0'
-            }
-        }
 
-        stage('Trivy Scan') {
+        stage('Checkout from git') {
             steps {
-                sh "trivy fs --format table -o trivy-fs-report.html ."
-            }
-        }
-        
-        stage('Sonarqube Analysis') {
-            steps {
-                
-                withSonarQubeEnv('sonar') {
-                    sh ''' $SONAR_HOME/bin/sonar-scanner -Dsonar.projectKey=Projeto -Dsonar.projectName=projetoindustria -Dsonar.java.binaries=. '''
+                withCredentials([string(credentialsId: 'github-url', variable: 'GITHUB_URL')]) {
+                    git branch: 'main', changelog: false, credentialsId: 'github-creds', poll: false, url: "${GITHUB_URL}"
                 }
             }
         }
         
+        stage('Trivy scan file system') {
+            steps {
+                sh 'trivy fs --format table -o trivy-fs-report.html .'
+            }
+        }
+
+        stage('Sonarqube analysis') {
+            steps {
+                withSonarQubeEnv('sonarqube') {
+                    sh '$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=$APP_NAME -Dsonar.projectKey=$APP_NAME -Dsonar.java.binaries=.'
+                }
+            }
+        }
+        
+        stage('Quality gate') {
+            steps {
+                script {
+                    waitForQualityGate abortPipeline: false, credentialsId: 'sonarqube'
+                }
+            }
+        }
+
+
         stage('Build') {
             steps {
-                sh "mvn clean package -DskipTests"
+                sh 'mvn clean package -DskipTests'
             }
         }
         
         stage('Build Docker Image') {
             steps {
                 script {
-                    dockerImage = docker.build registry + ":$BUILD_NUMBER" 
-                }
-            }
-        }
-        stage('Push Docker Image') {
-            steps {
-                script {
-                    docker.withRegistry( '', registryCredential ) { 
-                        dockerImage.push() 
+                    withCredentials([string(credentialsId: 'dockerhub-user', variable: 'DOCKERHUB_USR')]) {
+                        docker_image = docker.build("${DOCKERHUB_USR}/${APP_NAME}")
                     }
                 }
             }
         }
+        
+        stage('Trivy scan image') {
+            steps {
+                withCredentials([string(credentialsId: 'dockerhub-user', variable: 'DOCKERHUB_USR')]) {
+                    sh 'trivy image --severity HIGH,CRITICAL --format table -o trivy-image-report.html $DOCKERHUB_USR/$APP_NAME'
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'dockerhub-creds', toolName: 'docker') {
+                        docker_image.push("${IMAGE_TAG}")
+                        docker_image.push('latest')
+                    }
+                }
+            }
+        }
+
+        
         stage('Cleaning up') { 
             steps { 
-                sh "docker rmi $registry:$BUILD_NUMBER" 
+                script {
+                    withCredentials([string(credentialsId: 'dockerhub-user', variable: 'DOCKERHUB_USR')]) {
+                        sh 'docker rmi $DOCKERHUB_USR/$APP_NAME:$IMAGE_TAG' 
+                        sh 'docker rmi $DOCKERHUB_USR/$APP_NAME:latest'
+                        sh '''docker rmi $(docker images --filter "dangling=true" -q --no-trunc)'''
+                    }   
+                }
             }
+        }        
+    }
+    post {
+        always {
+            emailext attachLog: true,
+                     subject: "'${currentBuild.result}'",
+                     body: "Project: ${env.JOB_NAME}<br/>" +
+                           "Build Number: ${env.BUILD_NUMBER}<br/>" +
+                           "URL: ${env.BUILD_URL}<br/>",
+                     to: 'alxorozco@gmail.com',
+                     attachmentsPattern: 'trivy-fs-report.html,trivy-image-report.html'
         }
-        stage('Deploy on server') { 
-            steps { 
-
-            }
-        }
-
     }
 }
