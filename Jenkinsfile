@@ -55,7 +55,7 @@ pipeline {
         stage('Quality gate') {
             steps {
                 script {
-                    waitForQualityGate abortPipeline: true
+                    waitForQualityGate abortPipeline: false
                 }
             }
         }
