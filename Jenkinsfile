@@ -46,19 +46,20 @@ pipeline {
             steps {
                 withSonarQubeEnv('sonarqube') {
                     withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONARQUBE_TOKEN')]) {
-                        sh '$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=$APP_NAME -Dsonar.projectKey=$APP_NAME -Dsonar.java.binaries=. -Dsonar.login=$SONARQUBE_TOKEN'
+                        sh '$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=$APP_NAME -Dsonar.projectKey=$APP_NAME -Dsonar.java.binaries=. -Dsonar.login=$SONARQUBE_TOKEN -Dsonar.qualitygate.wait=true -Dsonar.qualitygate.timeout=300'
+//          -Dsonar.java.binaries=${SONARQUBE_JAVA_BINARIES_PATH}
                     }
                 }
             }
         }
         
-        stage('Quality gate') {
-            steps {
-                script {
-                    waitForQualityGate abortPipeline: false
-                }
-            }
-        }
+//        stage('Quality gate') {
+//            steps {
+//                script {
+//                    waitForQualityGate abortPipeline: false
+//                }
+//            }
+//        }
 
 
         stage('Build') {
